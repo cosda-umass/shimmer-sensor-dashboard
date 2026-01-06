@@ -252,7 +252,7 @@
     </div>
     
     <div class="p-6">
-      <!-- Tabs for Shimmer 1 and Shimmer 2 -->
+      <!-- Tabs for Left Hand and Right Hand -->
       <div class="mb-4 flex gap-2 border-b border-gray-200">
         <button 
           [class.active]="currentChartShimmer === 'shimmer1'"
@@ -260,7 +260,7 @@
           (click)="toggleShimmer('shimmer1')"
           [disabled]="selectedRow?.shimmer1 === '-'"
         >
-          Shimmer 1
+          Left Hand
         </button>
         <button 
           [class.active]="currentChartShimmer === 'shimmer2'"
@@ -268,7 +268,7 @@
           (click)="toggleShimmer('shimmer2')"
           [disabled]="selectedRow?.shimmer2 === '-'"
         >
-          Shimmer 2
+          Right Hand
         </button>
       </div>
       
@@ -281,6 +281,8 @@
         </canvas>
       </div>
       
+
+
       <!-- Statistics -->
       <div class="bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl p-6 border border-gray-200/50 shadow-sm">
         <h3 class="text-lg font-semibold text-[hsl(190,95%,30%)] mb-4 flex items-center gap-2">
@@ -312,6 +314,65 @@
           </div>
         </div>
       </div>
+
+            <!-- Timeline Information -->
+            <div *ngIf="timelineStart && timelineEnd" class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200/50 shadow-sm mb-6">
+              <h3 class="text-lg font-semibold text-[hsl(190,95%,30%)] mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Recording Timeline
+              </h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-blue-200/50 shadow-sm">
+                  <p class="text-sm text-gray-600 mb-1">Start Time</p>
+                  <p class="text-lg font-bold text-[hsl(190,95%,30%)]">{{ timelineStartFormatted }}</p>
+                </div>
+                <div class="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-blue-200/50 shadow-sm">
+                  <p class="text-sm text-gray-600 mb-1">End Time</p>
+                  <p class="text-lg font-bold text-[hsl(190,95%,30%)]">{{ timelineEndFormatted }}</p>
+                </div>
+              </div>
+              <div *ngIf="fileTimestamps && fileTimestamps.length > 0" class="mt-4">
+                <p class="text-sm font-semibold text-gray-700 mb-2">File Details ({{ fileTimestamps.length }} file{{ fileTimestamps.length > 1 ? 's' : '' }})</p>
+                <div class="max-h-48 overflow-y-auto space-y-2">
+                  <div *ngFor="let file of fileTimestamps" class="bg-white/80 backdrop-blur-sm rounded-lg p-3 border border-blue-200/50 text-xs">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <div>
+                        <p class="text-gray-500">File</p>
+                        <p class="font-medium text-gray-900 truncate" [title]="file.filename">{{ file.filename }}</p>
+                      </div>
+                      <div>
+                        <p class="text-gray-500">Timestamp</p>
+                        <p class="font-medium text-gray-900">{{ formatFileTimestamp(file.timestamp) }}</p>
+                      </div>
+                      <div *ngIf="file.duration_seconds">
+                        <p class="text-gray-500">Duration</p>
+                        <p class="font-medium text-gray-900">{{ file.duration_seconds | number:'1.1-1' }}s</p>
+                      </div>
+                      <div *ngIf="file.sample_rate">
+                        <p class="text-gray-500">Sample Rate</p>
+                        <p class="font-medium text-gray-900">{{ file.sample_rate | number:'1.1-1' }} Hz</p>
+                      </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-gray-200">
+                      <div>
+                        <p class="text-gray-500">Accel Samples</p>
+                        <p class="font-medium text-gray-900">{{ file.accel_samples | number }}</p>
+                      </div>
+                      <div *ngIf="file.uwb_samples">
+                        <p class="text-gray-500">UWB Samples</p>
+                        <p class="font-medium text-gray-900">{{ file.uwb_samples | number }}</p>
+                      </div>
+                      <div *ngIf="file.uwb_non_zero_count">
+                        <p class="text-gray-500">UWB Non-Zero</p>
+                        <p class="font-medium text-gray-900">{{ file.uwb_non_zero_count | number }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
     </div>
   </div>
 </div>

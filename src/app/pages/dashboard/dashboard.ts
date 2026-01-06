@@ -60,16 +60,55 @@ export class DashboardPage implements OnInit {
   };
   chartOptions: ChartConfiguration<'line'>['options'] = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
-      legend: { display: true }
+      legend: { 
+        display: true,
+        position: 'top'
+      },
+      tooltip: {
+        enabled: true,
+        callbacks: {
+          title: function() {
+            // Don't show time in tooltip
+            return '';
+          },
+          label: function(context: any) {
+            // Only show the acceleration value, not the time
+            return `${context.dataset.label}: ${context.parsed.y.toFixed(3)} m/s²`;
+          }
+        }
+      }
     },
     scales: {
       x: {
-        title: { display: true, text: 'Sample Index' }
+        display: true, // Ensure x-axis is always displayed
+        title: { display: true, text: 'Time' },
+        type: 'category', // Use category for string labels
+        ticks: {
+          display: true,
+          maxTicksLimit: 20,
+          autoSkip: true,
+          maxRotation: 45,
+          minRotation: 0
+        },
+        grid: {
+          display: true
+        }
       },
       y: {
-        title: { display: true, text: 'Acceleration (m/s²)' }
+        title: { display: true, text: 'Acceleration (m/s²)' },
+        min: 0,
+        max: 25,
+        beginAtZero: true
       }
+    },
+    interaction: {
+      intersect: false,
+      mode: 'index'
+    },
+    animation: {
+      duration: 0 // Disable animation for large datasets
     }
   };
   chartStats = {
@@ -80,6 +119,11 @@ export class DashboardPage implements OnInit {
     accelPoints: 0
   };
   currentChartShimmer: 'shimmer1' | 'shimmer2' = 'shimmer1';
+  timelineStart: string | null = null;
+  timelineEnd: string | null = null;
+  timelineStartFormatted: string = '';
+  timelineEndFormatted: string = '';
+  fileTimestamps: any[] = [];
   @ViewChild(BaseChartDirective) chart?: BaseChartDirective;
 
   columnDefs: ColDef[] = [
@@ -122,13 +166,10 @@ export class DashboardPage implements OnInit {
       cellRenderer: (params: any) => {
         const rowData = params.data;
         const dateStr = rowData?.date || '';
-        // Convert YYYY-MM-DD to MM/DD/YYYY
+        // Convert YYYY-MM-DD to YYYY/MM/DD
         let formattedDate = '';
         if (dateStr) {
-          const parts = dateStr.split('-');
-          if (parts.length === 3) {
-            formattedDate = `${parts[1]}/${parts[2]}/${parts[0]}`;
-          }
+          formattedDate = dateStr.replace(/-/g, '/');
         }
         return `
           <div style="display: flex; gap: 0.5rem; align-items: center; justify-content: center; flex-wrap: nowrap;">
@@ -335,14 +376,8 @@ export class DashboardPage implements OnInit {
             this.showChart(rowData);
           } else if (action === 'view-by-hour') {
             const dateStr = rowData?.date || '';
-            // Convert YYYY-MM-DD to MM/DD/YYYY
-            let formattedDate = '';
-            if (dateStr) {
-              const parts = dateStr.split('-');
-              if (parts.length === 3) {
-                formattedDate = `${parts[1]}/${parts[2]}/${parts[0]}`;
-              }
-            }
+            // Convert YYYY-MM-DD to YYYY/MM/DD
+            const formattedDate = dateStr ? dateStr.replace(/-/g, '/') : '';
             if (formattedDate) {
               this.router.navigate(['/home'], { queryParams: { filter: formattedDate } });
             }
@@ -383,54 +418,315 @@ export class DashboardPage implements OnInit {
       ? (this.selectedRow?.shimmer1UwbNonZero || 0)
       : (this.selectedRow?.shimmer2UwbNonZero || 0);
     
-    // Load both acceleration data and file data in parallel
-    forkJoin({
-      accelData: this.apiService.getCombinedDataField(filename, fieldName),
-      fileData: this.apiService.getCombinedDataFile(filename)
-    }).subscribe({
-      next: (results: any) => {
-        const values = results.accelData?.values || results.accelData || [];
-        const labels = Array.from({ length: values.length }, (_, i) => i.toString());
+    // Load file data which now contains both acceleration data and file metadata
+    this.apiService.getCombinedDataFile(filename).subscribe({
+      next: (response: any) => {
+        // The actual data is nested in response.data
+        const fileData = response?.data || response || {};
+        
+        console.log('Response structure:', response);
+        console.log('Extracted fileData:', fileData);
+        console.log('fileData.accel_wr_absolute_downsampled:', fileData?.accel_wr_absolute_downsampled?.length || 0);
+        console.log('fileData.file_timestamps:', fileData?.file_timestamps?.length || 0);
+        
+        // Extract data from the new structure
+        const values = fileData?.accel_wr_absolute_downsampled || [];
+        this.fileTimestamps = fileData?.file_timestamps || [];
+        
+        // Extract timeline information directly from JSON timestamp field (same as x-axis)
+        if (this.fileTimestamps.length > 0) {
+          // Use timestamp from JSON file directly - same as what's used for x-axis
+          const firstFile = this.fileTimestamps[0];
+          this.timelineStart = firstFile.timestamp || null;
+          
+          // Format start time same way as x-axis (HH:MM:SS from UTC)
+          if (this.timelineStart) {
+            const startDate = new Date(this.timelineStart);
+            const hours = startDate.getUTCHours().toString().padStart(2, '0');
+            const minutes = startDate.getUTCMinutes().toString().padStart(2, '0');
+            const seconds = startDate.getUTCSeconds().toString().padStart(2, '0');
+            this.timelineStartFormatted = `${hours}:${minutes}:${seconds}`;
+          }
+          
+          // Calculate timeline_end from last file's timestamp + 1 hour (only calculation)
+          const lastFile = this.fileTimestamps[this.fileTimestamps.length - 1];
+          const lastFileStart = new Date(lastFile.timestamp).getTime();
+          
+          // Add 1 hour to the last file's timestamp
+          const oneHourInMs = 60 * 60 * 1000; // 1 hour in milliseconds
+          const lastFileEnd = new Date(lastFileStart + oneHourInMs);
+          this.timelineEnd = lastFileEnd.toISOString();
+          
+          // Format end time same way as x-axis (HH:MM:SS from UTC)
+          if (this.timelineEnd) {
+            const endDate = new Date(this.timelineEnd);
+            const hours = endDate.getUTCHours().toString().padStart(2, '0');
+            const minutes = endDate.getUTCMinutes().toString().padStart(2, '0');
+            const seconds = endDate.getUTCSeconds().toString().padStart(2, '0');
+            this.timelineEndFormatted = `${hours}:${minutes}:${seconds}`;
+          }
+        } else {
+          this.timelineStart = null;
+          this.timelineEnd = null;
+          this.timelineStartFormatted = '';
+          this.timelineEndFormatted = '';
+        }
+        
+        // Generate time-based labels from file_timestamps
+        // Use downsampled_start_index and downsampled_end_index for accurate mapping
+        let labels: string[] = [];
+        
+        if (this.fileTimestamps.length > 0 && values.length > 0) {
+          // Downsampling ratio: 50 original samples = 1 downsampled point
+          const DOWNSAMPLE_RATIO = 50;
+          // Estimated sample rate (Hz) - typically 51.2 Hz for Shimmer sensors
+          const SAMPLE_RATE = 51.2;
+          // Time per original sample (seconds)
+          const TIME_PER_SAMPLE = 1 / SAMPLE_RATE;
+          // Time per downsampled point (seconds) = 50 samples * time per sample
+          const TIME_PER_DOWNSAMPLED_POINT = DOWNSAMPLE_RATIO * TIME_PER_SAMPLE;
+          
+          // Initialize labels array with the correct size
+          labels = new Array(values.length);
+          
+          // Calculate timestamps for each downsampled point based on file boundaries
+          for (let fileIdx = 0; fileIdx < this.fileTimestamps.length; fileIdx++) {
+            const file = this.fileTimestamps[fileIdx];
+            const fileStartTime = new Date(file.timestamp).getTime();
+            
+            // Use provided indices if available, otherwise calculate
+            const startIndex = file.downsampled_start_index !== undefined 
+              ? file.downsampled_start_index 
+              : (fileIdx === 0 ? 0 : this.fileTimestamps[fileIdx - 1].downsampled_end_index + 1);
+            
+            const endIndex = file.downsampled_end_index !== undefined
+              ? file.downsampled_end_index
+              : startIndex + (file.downsampled_samples || Math.ceil(file.accel_samples / DOWNSAMPLE_RATIO)) - 1;
+            
+            const downsampledPointsInFile = endIndex - startIndex + 1;
+            
+            console.log(`File ${fileIdx + 1}: ${file.filename}`);
+            console.log(`  Start time: ${file.timestamp}`);
+            console.log(`  Original samples: ${file.accel_samples}`);
+            console.log(`  Downsampled indices: ${startIndex} to ${endIndex} (${downsampledPointsInFile} points)`);
+            console.log(`  Time per downsampled point: ${TIME_PER_DOWNSAMPLED_POINT.toFixed(3)}s`);
+            
+            // Generate labels for this file's downsampled points
+            for (let i = 0; i < downsampledPointsInFile; i++) {
+              const globalIndex = startIndex + i;
+              
+              // Only process if within bounds
+              if (globalIndex >= 0 && globalIndex < values.length) {
+                // Calculate time offset: i * time per downsampled point
+                const timeOffsetSeconds = i * TIME_PER_DOWNSAMPLED_POINT;
+                const timeOffsetMs = timeOffsetSeconds * 1000;
+                const sampleTime = new Date(fileStartTime + timeOffsetMs);
+                
+                // Format as HH:MM:SS using UTC (since timestamp from JSON is in UTC)
+                const hours = sampleTime.getUTCHours().toString().padStart(2, '0');
+                const minutes = sampleTime.getUTCMinutes().toString().padStart(2, '0');
+                const seconds = sampleTime.getUTCSeconds().toString().padStart(2, '0');
+                labels[globalIndex] = `${hours}:${minutes}:${seconds}`;
+              }
+            }
+            
+            // Log the time range for this file
+            if (downsampledPointsInFile > 0) {
+              const fileEndTime = new Date(fileStartTime + (downsampledPointsInFile - 1) * TIME_PER_DOWNSAMPLED_POINT * 1000);
+              console.log(`  End time: ${fileEndTime.toISOString()}`);
+            }
+          }
+          
+          // Fill any missing labels (shouldn't happen, but safety check)
+          for (let i = 0; i < labels.length; i++) {
+            if (!labels[i]) {
+              // Use previous label or default
+              labels[i] = i > 0 ? labels[i - 1] : '00:00:00';
+            }
+          }
+          
+          console.log(`Total labels generated: ${labels.length}, Total values: ${values.length}`);
+        } else if (values.length > 0) {
+          // Fallback: Use sample indices if no file_timestamps
+          labels = Array.from({ length: values.length }, (_, i) => i.toString());
+        }
+        
+        // Create a new chart data object to trigger change detection
+        // Ensure we have valid data
+        if (labels.length === 0 || values.length === 0) {
+          console.error('No labels or values to display!', {
+            labelsLength: labels.length,
+            valuesLength: values.length
+          });
+        }
+        
+        // Display all data points as-is (no downsampling)
+        let displayLabels = labels;
+        let displayValues = values;
+        
+        // Ensure data is in correct format for Chart.js
+        // Chart.js expects numbers, not strings
+        const numericValues = displayValues.map((v: any) => {
+          const num = parseFloat(v);
+          return isNaN(num) ? 0 : num;
+        });
         
         this.chartData = {
-          labels: labels,
+          labels: displayLabels,
           datasets: [{
-            data: values,
+            data: numericValues,
             label: 'Accel_WR_Absolute',
             fill: false,
             borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgb(75, 192, 192)',
             tension: 0.4,
             pointRadius: 0,
-            pointHoverRadius: 0
+            pointHoverRadius: 0,
+            borderWidth: 1,
+            spanGaps: false
           }]
         };
+        
+        // Log to verify data format
+        console.log('Chart data prepared:', {
+          labelsType: typeof displayLabels[0],
+          dataType: typeof numericValues[0],
+          hasData: numericValues.length > 0,
+          dataRange: numericValues.length > 0 ? {
+            min: Math.min(...numericValues),
+            max: Math.max(...numericValues)
+          } : null
+        });
+        
+        console.log('Chart data set:', {
+          labelsCount: this.chartData.labels?.length || 0,
+          dataCount: this.chartData.datasets?.[0]?.data?.length || 0,
+          firstLabel: this.chartData.labels?.[0],
+          lastLabel: this.chartData.labels?.[this.chartData.labels.length - 1],
+          firstValue: this.chartData.datasets?.[0]?.data?.[0],
+          lastValue: this.chartData.datasets?.[0]?.data?.[this.chartData.datasets[0].data.length - 1],
+          sampleValues: this.chartData.datasets?.[0]?.data?.slice(0, 5),
+          chartDataStructure: JSON.stringify({
+            labels: this.chartData.labels?.slice(0, 3),
+            datasets: [{
+              data: this.chartData.datasets?.[0]?.data?.slice(0, 3),
+              label: this.chartData.datasets?.[0]?.label
+            }]
+          })
+        });
+        
+        // Update x-axis configuration if we have timeline data
+        const currentScales = this.chartOptions?.scales || {};
+        const currentXScale = (currentScales as any)?.['x'] || {};
+        
+        // Use time labels if we have file_timestamps, otherwise fallback
+        if (this.fileTimestamps.length > 0 && displayLabels.length > 0) {
+          // Extract file start times directly from JSON timestamp field (no calculations)
+          const fileStartTimes: string[] = [];
+          const fileStartIndices: number[] = [];
+          
+          this.fileTimestamps.forEach((file, idx) => {
+            const startIndex = file.downsampled_start_index !== undefined 
+              ? file.downsampled_start_index 
+              : (idx === 0 ? 0 : this.fileTimestamps[idx - 1].downsampled_end_index + 1);
+            
+            // Format the timestamp directly from JSON file (no filename parsing)
+            const fileDate = new Date(file.timestamp);
+            const hours = fileDate.getUTCHours().toString().padStart(2, '0');
+            const minutes = fileDate.getUTCMinutes().toString().padStart(2, '0');
+            const seconds = fileDate.getUTCSeconds().toString().padStart(2, '0');
+            const formattedTime = `${hours}:${minutes}:${seconds}`;
+            
+            fileStartTimes.push(formattedTime);
+            fileStartIndices.push(startIndex);
+          });
+          
+          // Store for callback access
+          const fileStartTimesForDisplay = fileStartTimes;
+          const fileStartIndicesForTicks = fileStartIndices;
+          
+          this.chartOptions = {
+            ...this.chartOptions,
+            scales: {
+              ...currentScales,
+              x: {
+                type: 'category', // CRITICAL: Use category for string labels
+                display: true, // Ensure x-axis is displayed
+                title: { 
+                  display: true, 
+                  text: 'Time',
+                  font: { size: 12 }
+                },
+                ticks: {
+                  display: true, // Ensure ticks are displayed
+                  // Only show file start times, no intermediate labels
+                  callback: (value: any, index: number, ticks: any[]) => {
+                    // Check if this index is a file start index
+                    if (fileStartIndicesForTicks.includes(index)) {
+                      // Return the formatted file start time
+                      const fileIdx = fileStartIndicesForTicks.indexOf(index);
+                      return fileStartTimesForDisplay[fileIdx] || value;
+                    }
+                    // Don't show any other labels - only file start times
+                    return undefined;
+                  },
+                  maxTicksLimit: this.fileTimestamps.length + 2, // Only show file starts
+                  autoSkip: false, // We control which labels to show
+                  maxRotation: 45,
+                  minRotation: 0,
+                  font: { size: 11 },
+                  color: '#000000',
+                  padding: 8
+                },
+                grid: {
+                  display: true,
+                  drawOnChartArea: true
+                }
+              }
+            }
+          };
+        } else if (this.timelineStart && this.timelineEnd) {
+          // Fallback to timeline_start/end
+          this.chartOptions = {
+            ...this.chartOptions,
+            scales: {
+              ...currentScales,
+              x: {
+                ...currentXScale,
+                title: { display: true, text: 'Time' }
+              }
+            }
+          };
+        } else {
+          // Reset to sample index if no timeline data
+          this.chartOptions = {
+            ...this.chartOptions,
+            scales: {
+              ...currentScales,
+              x: {
+                ...currentXScale,
+                title: { display: true, text: 'Sample Index' }
+              }
+            }
+          };
+        }
 
         // Try to get UWB count from file data as fallback, but prefer row data
-        console.log('Full file data:', results.fileData);
-        console.log('File data keys:', Object.keys(results.fileData || {}));
+        console.log('Full response:', response);
+        console.log('File data:', fileData);
+        console.log('File data keys:', Object.keys(fileData || {}));
         
-        // Recursive function to find uwb_dis_non_zero_count anywhere in the object
-        const findUwbCount = (obj: any): number => {
-          if (!obj || typeof obj !== 'object') return 0;
-          if (obj.uwb_dis_non_zero_count !== undefined && obj.uwb_dis_non_zero_count !== null) {
-            return Number(obj.uwb_dis_non_zero_count);
-          }
-          for (const key in obj) {
-            if (obj.hasOwnProperty(key) && typeof obj[key] === 'object') {
-              const result = findUwbCount(obj[key]);
-              if (result > 0) return result;
-            }
-          }
-          return 0;
-        };
-        
-        const uwbCountFromFile = findUwbCount(results.fileData);
+        // Get UWB count from file data (now directly available)
+        const uwbCountFromFile = fileData?.uwb_dis_non_zero_count || 0;
         const uwbCount = uwbCountFromRow > 0 ? uwbCountFromRow : uwbCountFromFile;
         const accelPoints = values.length || 0;
         
         console.log('UWB count from row:', uwbCountFromRow);
         console.log('UWB count from file:', uwbCountFromFile);
         console.log('UWB count final:', uwbCount);
+        console.log('Labels count:', labels.length);
+        console.log('Values count:', values.length);
+        console.log('File timestamps:', this.fileTimestamps.length);
         
         // Calculate statistics
         if (values.length > 0) {
@@ -452,12 +748,40 @@ export class DashboardPage implements OnInit {
           };
         }
 
-        this.showChartModal = true;
         this.isLoading = false;
         
+        // Show modal first
+        this.showChartModal = true;
+        this.cdr.detectChanges();
+        
+        // Force chart update after Angular has rendered
         setTimeout(() => {
-          this.chart?.update();
-        }, 100);
+          this.cdr.detectChanges();
+          if (this.chart) {
+            try {
+              // Force chart to re-render with new data
+              this.chart.update('none'); // 'none' mode for instant update
+              // Also try render to force redraw
+              this.chart.render();
+              console.log('Chart updated and rendered successfully');
+            } catch (error) {
+              console.error('Error updating chart:', error);
+            }
+          } else {
+            console.warn('Chart reference not available, will retry...');
+            // Retry after longer delay
+            setTimeout(() => {
+              this.cdr.detectChanges();
+              if (this.chart) {
+                this.chart.update('none');
+                this.chart.render();
+                console.log('Chart updated on retry');
+              } else {
+                console.error('Chart reference still not available after retry');
+              }
+            }, 500);
+          }
+        }, 200);
       },
       error: (err: any) => {
         console.error('Failed to load chart data', err);
@@ -467,8 +791,23 @@ export class DashboardPage implements OnInit {
     });
   }
 
+  formatFileTimestamp(timestamp: string): string {
+    if (!timestamp) return '';
+    // Format timestamp same way as x-axis (HH:MM:SS from UTC)
+    const date = new Date(timestamp);
+    const hours = date.getUTCHours().toString().padStart(2, '0');
+    const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+    const seconds = date.getUTCSeconds().toString().padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
+  }
+
   closeChartModal() {
     this.showChartModal = false;
+    this.timelineStart = null;
+    this.timelineEnd = null;
+    this.timelineStartFormatted = '';
+    this.timelineEndFormatted = '';
+    this.fileTimestamps = [];
   }
 
   downloadFile() {
