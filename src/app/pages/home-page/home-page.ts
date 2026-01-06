@@ -79,7 +79,7 @@ export class HomePage implements OnInit {
       y: {
         title: { display: true, text: this.y_axis_label },
         min: 0,
-        max: 50
+        max: 25
       }
     }
   };
@@ -354,7 +354,7 @@ export class HomePage implements OnInit {
         },
         y: {
           title: { display: true, text: this.y_axis_label },
-          min: -25,
+          min: 0,
           max: 25
         }
       }
