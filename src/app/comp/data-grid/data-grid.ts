@@ -301,6 +301,21 @@ export class DataGrid implements OnInit, OnChanges {
 
   constructor(private apiService: ApiService) {}
 
+  formatRecordedTimestamp(timestamp: string): string {
+    if (!timestamp) return '';
+    // Format as readable date-time: YYYY/MM/DD HH:MM:SS (UTC)
+    // timestampCal is ISO 8601 with UTC timezone (+00:00), so we display UTC time as-is
+    // No timezone conversion - both timestampCal and timestamp are in UTC
+    const date = new Date(timestamp);
+    const year = date.getUTCFullYear();
+    const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = date.getUTCDate().toString().padStart(2, '0');
+    const hours = date.getUTCHours().toString().padStart(2, '0');
+    const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+    const seconds = date.getUTCSeconds().toString().padStart(2, '0');
+    return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+  }
+
   ngOnInit(): void {
     // Set initial filter from input if provided
     if (this.initialFilter) {
@@ -330,7 +345,7 @@ export class DataGrid implements OnInit, OnChanges {
               shimmer1: item.shimmer1,
               shimmer2: item.shimmer2,
               // Shimmer 1 fields
-              shimmer1_recorded_timestamp: s1.recordedTimestamp ? new Date(s1.recordedTimestamp).toLocaleString() : null,
+              shimmer1_recorded_timestamp: s1.recordedTimestamp ? this.formatRecordedTimestamp(s1.recordedTimestamp) : null,
               shimmer1_time: s1.time,
               shimmer1_full_file_name: s1.full_file_name,
               shimmer1_mac_address: s1.macAddress,
@@ -341,7 +356,7 @@ export class DataGrid implements OnInit, OnChanges {
               shimmer1_part: s1.part,
               shimmer1_accel_var: s1.Accel_WR_VAR ? parseFloat(Number(s1.Accel_WR_VAR).toFixed(4)) : null,
               // Shimmer 2 fields
-              shimmer2_recorded_timestamp: s2.recordedTimestamp ? new Date(s2.recordedTimestamp).toLocaleString() : null,
+              shimmer2_recorded_timestamp: s2.recordedTimestamp ? this.formatRecordedTimestamp(s2.recordedTimestamp) : null,
               shimmer2_time: s2.time,
               shimmer2_full_file_name: s2.full_file_name,
               shimmer2_mac_address: s2.macAddress,

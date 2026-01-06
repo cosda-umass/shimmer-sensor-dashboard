@@ -111,7 +111,18 @@ export class DailyAggregatorPage implements OnInit {
       },
       error: (err: any) => {
         console.error('Error triggering daily aggregator:', err);
-        this.error = err?.error?.detail || err?.message || 'Failed to trigger daily aggregator';
+        console.error('Full error object:', JSON.stringify(err, null, 2));
+        
+        // Check for CORS error specifically
+        if (err?.message?.includes('CORS') || err?.message?.includes('Access-Control-Allow-Origin')) {
+          this.error = `CORS Error: The backend API is not allowing requests from this origin. This usually happens when the backend returns an error without CORS headers. Date: ${this.selectedDate || 'auto'}. Please check backend logs.`;
+        } else if (err?.status === 0) {
+          // Network error or CORS preflight failure
+          this.error = `Network/CORS Error: Unable to reach the API. This may be a CORS configuration issue on the backend. Date: ${this.selectedDate || 'auto'}.`;
+        } else {
+          this.error = err?.error?.detail || err?.error?.message || err?.message || `Failed to trigger daily aggregator. Status: ${err?.status || 'unknown'}`;
+        }
+        
         this.isLoading = false;
         this.cdr.detectChanges();
       }
