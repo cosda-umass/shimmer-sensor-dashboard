@@ -191,4 +191,9 @@ export class ApiService {
     const params = new HttpParams().set('full_file_name', rawFileName);
     return this.http.get<{ download_url: string; s3_key: string }>(`${this.baseUrl}/get-decoded-file-url/`, { params });
   }
+
+  // Download zip by date endpoint
+  downloadZipByDate(date: string): Observable<{ download_url: string; count: number }> {
+    return this.http.get<{ download_url: string; count: number }>(`${this.baseUrl}/download-zip-by-date/${date}`);
+  }
 }
