@@ -83,7 +83,7 @@ export class DashboardPage implements OnInit {
     scales: {
       x: {
         display: true, // Ensure x-axis is always displayed
-        title: { display: true, text: 'Time' },
+        title: { display: true, text: 'Time (GMT)' },
         type: 'category', // Use category for string labels
         ticks: {
           display: true,
@@ -127,11 +127,11 @@ export class DashboardPage implements OnInit {
   @ViewChild(BaseChartDirective) chart?: BaseChartDirective;
 
   columnDefs: ColDef[] = [
-    { field: 'date', headerName: 'Date', sortable: true, filter: 'agTextColumnFilter', width: 150, flex: 0, suppressSizeToFit: true },
+    { field: 'date', headerName: 'Date (GMT)', sortable: true, filter: 'agTextColumnFilter', width: 150, flex: 0, suppressSizeToFit: true },
     { field: 'patient', headerName: 'Patient', sortable: true, filter: 'agTextColumnFilter', width: 130, flex: 0, suppressSizeToFit: true },
     { field: 'device', headerName: 'Device', sortable: true, filter: 'agTextColumnFilter', width: 200, flex: 0, suppressSizeToFit: true },
-    { field: 'shimmer1', headerName: 'Shimmer1', sortable: true, filter: 'agTextColumnFilter', width: 200, flex: 0, suppressSizeToFit: true },
-    { field: 'shimmer2', headerName: 'Shimmer2', sortable: true, filter: 'agTextColumnFilter', width: 200, flex: 0, suppressSizeToFit: true },
+    { field: 'shimmer1', headerName: 'Left Hand', sortable: true, filter: 'agTextColumnFilter', width: 200, flex: 0, suppressSizeToFit: true },
+    { field: 'shimmer2', headerName: 'Right Hand', sortable: true, filter: 'agTextColumnFilter', width: 200, flex: 0, suppressSizeToFit: true },
     { 
       field: 'shimmer1File', 
       headerName: 'Shimmer1 File', 
@@ -654,7 +654,7 @@ export class DashboardPage implements OnInit {
                 display: true, // Ensure x-axis is displayed
                 title: { 
                   display: true, 
-                  text: 'Time',
+                  text: 'Time (GMT)',
                   font: { size: 12 }
                 },
                 ticks: {
@@ -693,7 +693,7 @@ export class DashboardPage implements OnInit {
               ...currentScales,
               x: {
                 ...currentXScale,
-                title: { display: true, text: 'Time' }
+                title: { display: true, text: 'Time (GMT)' }
               }
             }
           };
