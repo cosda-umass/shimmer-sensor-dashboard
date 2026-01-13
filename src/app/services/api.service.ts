@@ -193,7 +193,12 @@ export class ApiService {
   }
 
   // Download zip by date endpoint
-  downloadZipByDate(date: string): Observable<{ download_url: string; count: number }> {
-    return this.http.get<{ download_url: string; count: number }>(`${this.baseUrl}/download-zip-by-date/${date}`);
+  downloadZipByDate(date: string, user?: string): Observable<{ download_url: string; count: number; date: string; user?: string }> {
+    let url = `${this.baseUrl}/download-zip-by-date/${date}`;
+    if (user) {
+      const params = new HttpParams().set('user', user);
+      return this.http.get<{ download_url: string; count: number; date: string; user?: string }>(url, { params });
+    }
+    return this.http.get<{ download_url: string; count: number; date: string; user?: string }>(url);
   }
 }

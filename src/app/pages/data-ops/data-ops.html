@@ -45,6 +45,19 @@
               placeholder="Select date (YYYY-MM-DD)"
             />
           </div>
+          <div class="flex-1">
+            <label for="user-select" class="block text-sm font-medium text-gray-700 mb-2">
+              User/Patient (Optional)
+            </label>
+            <select
+              id="user-select"
+              [(ngModel)]="selectedUser"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[hsl(190,95%,30%)] bg-white"
+            >
+              <option value="">All Users</option>
+              <option *ngFor="let user of users" [value]="user">{{ user }}</option>
+            </select>
+          </div>
           <div class="flex gap-3">
             <button
               (click)="downloadZipByDate()"
@@ -62,7 +75,7 @@
             </button>
             <button
               (click)="clearDate()"
-              [disabled]="isDownloading || !selectedDate"
+              [disabled]="isDownloading || (!selectedDate && !selectedUser)"
               class="bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 inline-flex items-center gap-2"
             >
               Clear
@@ -86,7 +99,10 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span class="text-green-800 font-semibold">Found {{ downloadResult.count }} file(s) for {{ selectedDate }}</span>
+            <div class="flex flex-col">
+              <span class="text-green-800 font-semibold">Found {{ downloadResult.count }} file(s) for {{ downloadResult.date }}</span>
+              <span *ngIf="downloadResult.user" class="text-green-700 text-sm">User: {{ downloadResult.user }}</span>
+            </div>
           </div>
           <a
             [href]="downloadResult.download_url"

@@ -18,8 +18,10 @@ export class DataOps implements OnInit {
 
   // Download zip by date
   selectedDate: string = '';
+  selectedUser: string = '';
+  users: string[] = [];
   isDownloading = false;
-  downloadResult: { download_url: string; count: number } | null = null;
+  downloadResult: { download_url: string; count: number; date: string; user?: string } | null = null;
   downloadError: string = '';
 
   constructor(private api: ApiService, private router: Router) {}
@@ -36,7 +38,19 @@ export class DataOps implements OnInit {
 
   ngOnInit(): void {
     this.checkAuth();
-    // Add any data loading logic here if needed
+    this.loadUsers();
+  }
+
+  loadUsers() {
+    this.api.listUniquePatients().subscribe({
+      next: (patients) => {
+        this.users = Array.isArray(patients) ? patients.sort() : [];
+      },
+      error: (err) => {
+        console.error('Error loading users:', err);
+        this.users = [];
+      }
+    });
   }
 
   onLogout() {
@@ -72,11 +86,13 @@ export class DataOps implements OnInit {
     this.downloadError = '';
     this.downloadResult = null;
 
-    this.api.downloadZipByDate(this.selectedDate).subscribe({
+    const userParam = this.selectedUser && this.selectedUser.trim() !== '' ? this.selectedUser.trim() : undefined;
+    this.api.downloadZipByDate(this.selectedDate, userParam).subscribe({
       next: (response) => {
         this.downloadResult = response;
         this.isDownloading = false;
-        this.toast(`Found ${response.count} files. Download link ready!`, 'success');
+        const userMsg = response.user ? ` for ${response.user}` : '';
+        this.toast(`Found ${response.count} files${userMsg}. Download link ready!`, 'success');
       },
       error: (err) => {
         console.error('Error downloading zip by date:', err);
@@ -90,6 +106,7 @@ export class DataOps implements OnInit {
 
   clearDate() {
     this.selectedDate = '';
+    this.selectedUser = '';
     this.downloadResult = null;
     this.downloadError = '';
   }
